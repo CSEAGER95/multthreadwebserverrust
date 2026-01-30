@@ -3,15 +3,19 @@ use std::{
     io::{BufReader,prelude::*},
     net::{TcpListener, TcpStream},
 };
+use multthreadwebserverrust::ThreadPool;
+
 
 fn main() {
-    let addr = "127.0.0.1:7878"; //this is an ip addr that represents my computer, the port is a random port that usually doesn't accept HTTP requests.
-    let listener = TcpListener::bind(addr).unwrap();
+    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+    let pool = ThreadPool::new(4);
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
 
-        handle_connection(stream);
+        pool.execute(|| {
+            handle_connection(stream);
+        });
     }
 }
 
