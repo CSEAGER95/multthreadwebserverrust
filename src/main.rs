@@ -1,18 +1,25 @@
+use mtwsrust::ThreadPool;
 use std::{
     fs,
-    io::{BufReader,prelude::*},
+    io::{BufReader, prelude::*},
     net::{TcpListener, TcpStream},
+    thread,
+    time::Duration,
 };
 
 fn main() {
-    let addr = "127.0.0.1:7878"; //this is an ip addr that represents my computer, the port is a random port that usually doesn't accept HTTP requests.
-    let listener = TcpListener::bind(addr).unwrap();
+    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+    let pool = ThreadPool::new(4);
 
-    for stream in listener.incoming() {
+    for stream in listener.incoming().take(2) {
         let stream = stream.unwrap();
 
-        handle_connection(stream);
+        pool.execute(|| {
+            handle_connection(stream);
+        });
     }
+
+    println!("Shutting down.");
 }
 
 fn handle_connection(mut stream: TcpStream) {
@@ -25,10 +32,13 @@ fn handle_connection(mut stream: TcpStream) {
     
     let request_line = &http_request[0];
 
-    let (status_line, filename) = if request_line == "GET / HTTP/1.1" {
-        ("HTTP/1.1 200 OK", "src/hello.html")
-    } else {
-        ("HTTP/1.1 404 NOT FOUND", "src/404.html")
+    let (status_line, filename) = match &request_line[..] {
+        "GET / HTTP/1.1" => ("HTTP/1.1 200 OK", "hello.html"),
+        "GET /sleep HTTP/1.1" => {
+            thread::sleep(Duration::from_secs(5));
+            ("HTTP/1.1 200 OK", "hello.html")
+        }
+        _ => ("HTTP/1.1 404 NOT FOUND", "404.html"),
     };
 
     let contents = fs::read_to_string(filename).unwrap();
